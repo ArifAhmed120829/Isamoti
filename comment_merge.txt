@@ -1,0 +1,170 @@
+import subprocess
+import sys
+import re
+import time
+import tempfile
+import os
+
+
+def create_temp_script(content, file_name):
+    """Create a temporary script file with the given content."""
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, file_name)
+
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    return file_path
+
+
+def extract_analysis_from_output(output):
+    """Extract the factual analysis from the checker script output."""
+    # Look for text between "Factual Analysis:" and a line of equal signs
+    analysis_match = re.search(r'Factual Analysis:\n={1,80}\n(.*?)={1,80}', output, re.DOTALL)
+
+    if analysis_match:
+        # Return the captured group (the analysis)
+        return analysis_match.group(1).strip()
+    else:
+        # Fallback: try to find any analysis-like content
+        lines = output.split('\n')
+        for i, line in enumerate(lines):
+            if "analyzing tweet truthfulness" in line.lower():
+                # Return the next non-empty line
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip() and not lines[j].startswith("="):
+                        return lines[j].strip()
+
+    return "Based on fact-checking, this tweet's accuracy could not be fully verified."
+
+
+def run_checker_script(tweet_url):
+    """Run the Twitter post checker script and capture its output."""
+    print(f"Checking factual accuracy of: {tweet_url}")
+
+    # Create a modified version of the checker script that prints the analysis to stdout
+    with open("Twitter_post_checker.py", "r") as f:
+        checker_content = f.read()
+
+    # Modify the script to accept command line argument
+    modified_content = checker_content.replace(
+        'tweet_url = input("Enter the Twitter/X post URL (e.g., https://x.com/username/status/123456): ")',
+        f'tweet_url = "{tweet_url}"'
+    )
+
+    # Create temporary modified script
+    temp_checker_path = create_temp_script(modified_content, "temp_checker.py")
+
+    try:
+        # Run the modified script
+        result = subprocess.run(
+            [sys.executable, temp_checker_path],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print("Error running Twitter post checker:")
+            print(result.stderr)
+            return None
+
+        # Extract the analysis from the output
+        return extract_analysis_from_output(result.stdout)
+
+    except Exception as e:
+        print(f"Error running checker script: {str(e)}")
+        return None
+    finally:
+        # Clean up
+        try:
+            os.remove(temp_checker_path)
+        except:
+            pass
+
+
+def run_reply_script(post_url, reply_text):
+    """Run the Twitter reply script with the given reply text."""
+    print(f"Posting reply to: {post_url}")
+    print(f"Reply text: {reply_text}")
+
+    # Create a modified version of the reply script
+    with open("reply_twitter.py", "r") as f:
+        reply_content = f.read()
+
+    # Modify the script to use our post URL
+    modified_content = reply_content.replace(
+        'post_url = "https://x.com/VHindus71/status/1914014956208677189"',
+        f'post_url = "{post_url}"'
+    )
+
+    # Replace the reply_text with our analysis
+    modified_content = modified_content.replace(
+        'reply_text = "this is my first reply"',
+        f'reply_text = """{reply_text}"""'
+    )
+
+    # Create temporary modified script
+    temp_reply_path = create_temp_script(modified_content, "temp_reply.py")
+
+    try:
+        # Run the modified script
+        print("Running Twitter reply script...")
+        subprocess.run([sys.executable, temp_reply_path])
+
+    except Exception as e:
+        print(f"Error running reply script: {str(e)}")
+    finally:
+        # Clean up
+        try:
+            os.remove(temp_reply_path)
+        except:
+            pass
+
+
+def format_reply_text(analysis):
+    """Format the analysis to fit Twitter character limits and style."""
+    # Twitter has a 280 character limit
+    if len(analysis) <= 270:
+        return analysis
+
+    # Truncate and add ellipsis
+    return analysis[:267] + "..."
+
+
+def main():
+    # Get tweet URL from command line or prompt
+    if len(sys.argv) > 1:
+        tweet_url = sys.argv[1]
+    else:
+        tweet_url = input("Enter the Twitter/X post URL to analyze and reply to: ")
+
+    # Step 1: Run the checker script to analyze the tweet
+    analysis = run_checker_script(tweet_url)
+
+    if not analysis:
+        print("Failed to generate analysis. Exiting.")
+        return
+
+    print("\nGenerated analysis:")
+    print("-" * 60)
+    print(analysis)
+    print("-" * 60)
+
+    # Step 2: Format the reply text
+    reply_text = format_reply_text(analysis)
+
+    # Step 3: Confirm before posting
+    print("\nReady to post this reply:")
+    print(reply_text)
+
+    confirm = input("\nDo you want to post this reply? (y/n): ")
+    if confirm.lower() != 'y':
+        print("Reply cancelled.")
+        return
+
+    # Step 4: Run the reply script with the SAME tweet URL
+    run_reply_script(tweet_url, reply_text)
+
+
+if __name__ == "__main__":
+    main()
