@@ -340,12 +340,13 @@ def post_and_exit(root, tweet_url, reply_text):
     root.destroy()
    
     # Save the reply text to a temporary file
-    with open("temp_reply.txt", "w") as f:
+    with open("selected_response.txt", "w") as f:
         f.write(reply_text)
     run_reply_script(tweet_url, reply_text)
 
 
 
+# In the show_true_response function, modify the post_and_exit call to include saving the response:
 def show_true_response(root, tweet_url, analysis):
     """Show positive response for true tweets with confirmation option."""
     root.title("Tweet Analysis Result")

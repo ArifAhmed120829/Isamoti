@@ -186,9 +186,9 @@ def search_duckduckgo(query):
     try:
         print(f"Searching DuckDuckGo for: {query}")
         # Add freshness filter (last 24 hours) and news sources
-        #modified_query = f"{query} after:2020-01-01"
+        modified_query = f"{query} after:2020-01-01"
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
+            results = list(ddgs.text(modified_query, max_results=3))
             return results
     except Exception as e:
         print(f"Error searching DuckDuckGo: {str(e)}")
