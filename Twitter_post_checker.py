@@ -185,6 +185,8 @@ def generate_news_titles(llm, tweet_text):
 def search_duckduckgo(query):
     try:
         print(f"Searching DuckDuckGo for: {query}")
+        # Add freshness filter (last 24 hours) and news sources
+        #modified_query = f"{query} after:2020-01-01"
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=3))
             return results

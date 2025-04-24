@@ -44,19 +44,24 @@ def extract_analysis_from_output(output):
 
 def is_tweet_false(analysis):
     """Determine if the tweet is false based on the analysis."""
+    if not analysis:
+        return False
     lower_analysis = analysis.lower()
+    # Explicit TRUE detection
+    if "this tweet is true" in lower_analysis or "the tweet is true" in lower_analysis:
+        return False
     
-    # Keywords that indicate the tweet is false
+    # Rest of your existing false detection logic
     false_indicators = [
         "false", "misleading", "incorrect", "untrue", "inaccurate", 
-        "no credible", "no evidence", "cannot be verified", "unverified",
-        "not supported", "not substantiated", "doesn't match"
+        "no credible", "no evidence", "cannot be verified"
     ]
     
     # Check if any false indicators are in the analysis
     for indicator in false_indicators:
         if indicator in lower_analysis:
             return True
+    return any(indicator in lower_analysis for indicator in false_indicators)    
             
     # If no clear indicators, check if it generally seems negative
     negative_score = 0
@@ -379,61 +384,81 @@ def show_true_response(root, tweet_url, analysis):
 
 
 def extract_tweet_text(tweet_url):
-    """Extract the tweet text using a simplified method from Twitter_post_checker.py."""
+    """More robust tweet extraction with proper Chrome setup"""
     try:
-        # Create a modified version of the checker script that outputs the tweet text
-        with open("Twitter_post_checker.py", "r") as f:
-            checker_content = f.read()
-        
-        # Add code to print the tweet text to a file
-        extract_code = """
-def extract_only_tweet_text(url):
-    driver = setup_driver()
-    try:
-        tweet_text = get_tweet_text(driver, url)
-        with open("tweet_text_temp.txt", "w") as f:
-            f.write(tweet_text if tweet_text else "")
-    finally:
-        driver.quit()
+        # Create extraction script with proper Chrome setup
+        extract_code = f"""
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 
-if __name__ == "__main__":
-    extract_only_tweet_text(tweet_url)
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=chrome_options)
+
+def get_tweet_text(driver, url):
+    driver.get(url)
+    try:
+        tweet_element = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="tweetText"]'))
+        )
+        return tweet_element.text
+    except Exception as e:
+        print(f"Extraction error: {{str(e)}}")
+        return None
+
+driver = None
+try:
+    driver = setup_driver()
+    tweet_text = get_tweet_text(driver, '{tweet_url}')
+    with open("tweet_text_temp.txt", "w") as f:
+        f.write(tweet_text if tweet_text else "")
+except Exception as e:
+    print(f"Error during extraction: {{str(e)}}")
+finally:
+    if driver:
+        driver.quit()
 """
+
+        # Create temporary script
+        temp_extractor_path = create_temp_script(extract_code, "temp_tweet_extractor.py")
         
-        modified_content = checker_content.replace(
-            'def main():',
-            extract_code
-        ).replace(
-            'if __name__ == "__main__":\n    main()',
-            'if __name__ == "__main__":\n    extract_only_tweet_text(tweet_url)'
-        ).replace(
-            'tweet_url = input("Enter the Twitter/X post URL (e.g., https://x.com/username/status/123456): ")',
-            f'tweet_url = "{tweet_url}"'
+        # Run the script with timeout
+        subprocess.run(
+            [sys.executable, temp_extractor_path],
+            check=True,
+            timeout=30  # 30 second timeout
         )
         
-        # Create temporary modified script
-        temp_extractor_path = create_temp_script(modified_content, "temp_tweet_extractor.py")
-        
-        # Run the modified script
-        subprocess.run([sys.executable, temp_extractor_path], stdout=subprocess.PIPE)
-        
-        # Read the extracted tweet text
+        # Read results
         try:
             with open("tweet_text_temp.txt", "r") as f:
-                tweet_text = f.read()
-            os.remove("tweet_text_temp.txt")
-            return tweet_text
-        except:
+                return f.read().strip()
+        except FileNotFoundError:
             return ""
+            
+    except subprocess.TimeoutExpired:
+        print("Tweet extraction timed out")
+        return ""
     except Exception as e:
-        print(f"Error extracting tweet text: {str(e)}")
+        print(f"Error extracting tweet text: {{str(e)}}")
         return ""
     finally:
+        # Clean up
         try:
             os.remove(temp_extractor_path)
+            os.remove("tweet_text_temp.txt")
         except:
             pass
-
 
 def main():
     # Get tweet URL from command line or prompt
