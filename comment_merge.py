@@ -7,11 +7,6 @@ import os
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-from Twitter_post_checker import GroqAPI
-
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
-
-
 
 def create_temp_script(content, file_name):
     """Create a temporary script file with the given content."""
@@ -436,33 +431,6 @@ def show_true_response(root, tweet_url, analysis):
     # Generate the response first
     response = generate_true_response(analysis)
 
-    ####my short response using llm 
-    # If response is too long, generate a shorter version
-    if len(response) > 250:
-        print("Response too long, generating concise version...")
-        concise_prompt = f"""
-        Please summarize this fact-check response to be under 250 characters for Twitter,
-        while preserving the key factual information:
-        
-        Original response: {response}
-        
-        Concise version:
-        """
-        
-        # Initialize LLM (you'll need to pass your LLM instance or initialize here)
-        llm = GroqAPI(model_id="llama3-8b-8192", api_key=GROQ_API_KEY)
-        concise_response = llm.generate(concise_prompt, temperature=0.1, max_tokens=100)
-        
-        # Fallback if LLM fails or response is still too long
-        if len(concise_response) > 250 or not concise_response.strip():
-            print("Using fallback shortening method")
-            concise_response = response[:225] + "..." if len(response) > 225 else response
-        else:
-            response = concise_response.strip()
-
-
-         ###end   
-    
     # Save the response immediately to ensure it's available
     with open("selected_response.txt", "w") as f:
         f.write(response)
