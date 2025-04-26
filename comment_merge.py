@@ -63,19 +63,19 @@ def is_tweet_false(analysis):
             return True
     return any(indicator in lower_analysis for indicator in false_indicators)    
             
-    # If no clear indicators, check if it generally seems negative
-    negative_score = 0
-    positive_score = 0
+    # # If no clear indicators, check if it generally seems negative
+    # negative_score = 0
+    # positive_score = 0
     
-    # Keywords that might indicate falsehood
-    if any(word in lower_analysis for word in ["doubt", "skeptic", "question", "exaggerat"]):
-        negative_score += 1
+    # # Keywords that might indicate falsehood
+    # if any(word in lower_analysis for word in ["doubt", "skeptic", "question", "exaggerat"]):
+    #     negative_score += 1
         
-    # Keywords that might indicate truth
-    if any(word in lower_analysis for word in ["confirm", "verify", "true", "accurate", "correct"]):
-        positive_score += 1
+    # # Keywords that might indicate truth
+    # if any(word in lower_analysis for word in ["confirm", "verify", "true", "accurate", "correct"]):
+    #     positive_score += 1
         
-    return negative_score > positive_score
+    # return negative_score > positive_score
 
 
 def run_checker_script(tweet_url):
@@ -328,29 +328,94 @@ def show_final_confirmation(root, tweet_url, reply_text):
     btn_frame = ttk.Frame(frame)
     btn_frame.pack(fill="x", pady=20)
     
-    ttk.Button(btn_frame, text="Post Reply", 
-               command=lambda: post_and_exit(root, tweet_url, reply_text)).pack(side="right", padx=5)
+    # Save the reply text immediately to both files
+    with open("temp_reply.txt", "w") as f:
+        f.write(reply_text)
+    
+    with open("selected_response.txt", "w") as f:
+        f.write(reply_text)
+    
+    # For true tweets, add an auto-proceed option
+    if "appears to be accurate" in reply_text or "checks out" in reply_text or "confirms the accuracy" in reply_text:
+        ttk.Label(frame, text="Automatically proceeding in 3 seconds...", 
+                  font=("Arial", 10, "italic")).pack(pady=(5, 0))
+        
+        # Schedule auto-posting with delay
+        root.after(3000, lambda: run_twitter_reply_directly(root, tweet_url, reply_text))
+    
+    ttk.Button(btn_frame, text="Post Reply Now", 
+               command=lambda: run_twitter_reply_directly(root, tweet_url, reply_text)).pack(side="right", padx=5)
     
     ttk.Button(btn_frame, text="Cancel", 
                command=root.destroy).pack(side="right", padx=5)
 
-
-def post_and_exit(root, tweet_url, reply_text):
-    """Post the reply and close the application."""
-    root.destroy()
-   
-    # Save the reply text to a temporary file
+def run_twitter_reply_directly(root, tweet_url, reply_text):
+    """Directly run the Twitter reply script without closing the window first."""
+    # Save the files again just to be safe
+    with open("temp_reply.txt", "w") as f:
+        f.write(reply_text)
+    
     with open("selected_response.txt", "w") as f:
         f.write(reply_text)
-    run_reply_script(tweet_url, reply_text)
+    
+    print(f"Posting reply: {reply_text}")
+    print(f"To tweet: {tweet_url}")
+    
+    # Run the reply script directly
+    try:
+        # Create a modified version of the reply script that won't need input at the end
+        with open("reply_twitter.py", "r") as f:
+            reply_content = f.read()
+        
+        # Remove the input at the end that waits for user interaction
+        modified_content = reply_content.replace(
+            'input("Press Enter to close browser...")',
+            'time.sleep(60)'  # Let the browser stay open for a minute
+        )
+        
+        # Use our URL and response
+        modified_content = modified_content.replace(
+            'post_url = "https://x.com/rajlokkhi123/status/1915318877107474904"',
+            f'post_url = "{tweet_url}"'
+        )
+        
+        # Create temporary file with modifications
+        import tempfile
+        import os
+        temp_dir = tempfile.gettempdir()
+        temp_script_path = os.path.join(temp_dir, "temp_reply_script.py")
+        
+        with open(temp_script_path, "w") as f:
+            f.write(modified_content)
+        
+        # Run the modified script
+        print("Running Twitter reply script directly...")
+        import subprocess
+        import sys
+        subprocess.Popen([sys.executable, temp_script_path])
+        
+        # Close the UI
+        root.destroy()
+        
+    except Exception as e:
+        print(f"Error launching Twitter reply: {str(e)}")
+        messagebox.showerror("Error", f"Failed to launch Twitter reply: {str(e)}")
 
 
-
-# In the show_true_response function, modify the post_and_exit call to include saving the response:
 def show_true_response(root, tweet_url, analysis):
     """Show positive response for true tweets with confirmation option."""
+    print("\n")
+    print("\nhellooooo")
     root.title("Tweet Analysis Result")
     
+    # Generate the response first
+    response = generate_true_response(analysis)
+    
+    # Save the response immediately to ensure it's available
+    with open("selected_response.txt", "w") as f:
+        f.write(response)
+    
+    # Create UI to show what's happening
     frame = ttk.Frame(root, padding="20")
     frame.pack(fill="both", expand=True)
     
@@ -362,27 +427,11 @@ def show_true_response(root, tweet_url, analysis):
     ttk.Label(frame, text="This tweet appears to be TRUE.", 
               font=("Arial", 12, "bold"), foreground="green").pack(pady=(0, 15))
     
-    response = generate_true_response(analysis)
+    # Instead of handling it ourselves, call the same function that works for false tweets
+    # This ensures we follow the exact same path that's working for false tweets
     
-    ttk.Label(frame, text="Suggested Response:", 
-              font=("Arial", 11, "bold")).pack(anchor="w", pady=(0, 5))
-    
-    text_area = tk.Text(frame, wrap="word", height=4, width=60)
-    text_area.insert("1.0", response)
-    text_area.config(state="disabled")
-    text_area.pack(fill="both", expand=True, pady=10)
-    
-    btn_frame = ttk.Frame(frame)
-    btn_frame.pack(fill="x", pady=20)
-    
-    ttk.Button(btn_frame, text="Post Reply", 
-               command=lambda: post_and_exit(root, tweet_url, response)).pack(side="right", padx=5)
-    
-    ttk.Button(btn_frame, text="Cancel", 
-               command=root.destroy).pack(side="right", padx=5)
-    
-    root.geometry("600x400")
-
+    show_final_confirmation(root, tweet_url, response)
+    print("\nBoli")
 
 def extract_tweet_text(tweet_url):
     """More robust tweet extraction with proper Chrome setup"""
@@ -489,6 +538,7 @@ def main():
     
     # Check if the tweet is false
     is_false = is_tweet_false(analysis)
+    
     
     # Show appropriate UI based on analysis
     root.deiconify()  # Show the window
