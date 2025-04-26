@@ -7,6 +7,9 @@ import os
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
+from Twitter_post_checker import GroqAPI
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
 
 
 
@@ -404,34 +407,74 @@ def run_twitter_reply_directly(root, tweet_url, reply_text):
 
 def show_true_response(root, tweet_url, analysis):
     """Show positive response for true tweets with confirmation option."""
-    print("\n")
-    print("\nhellooooo")
-    root.title("Tweet Analysis Result")
+    root.title("Tweet analysis result")
+    
+    # Create a frame for the text
+    text_frame = ttk.Frame(root, padding="10")
+    text_frame.pack(fill="both", expand=True)
+    
+    # Add the analysis
+    ttk.Label(text_frame, text="Analysis Result:", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+    ttk.Label(text_frame, text=analysis, wraplength=500).pack(fill="x", pady=(0, 15))
+    
+    ttk.Label(text_frame, text="This tweet appears to be True.", 
+              font=("Arial", 12, "bold"), foreground="red").pack(pady=(0, 15))
+    
+    ttk.Label(text_frame, text="Choose a response style:", 
+              font=("Arial", 11)).pack(anchor="w", pady=(0, 10))
+    
+    # Create a frame for the buttons
+    button_frame = ttk.Frame(root, padding="10")
+    button_frame.pack(fill="x", pady=10)
+    
+    # Add styled buttons with appropriate callbacks
+    style = ttk.Style()
+    style.configure("Simple.TButton", background="#e0e0e0")
+    style.configure("Medium.TButton", background="#ffd700")
+    style.configure("Extreme.TButton", background="#ff6347")
     
     # Generate the response first
     response = generate_true_response(analysis)
+
+    ####my short response using llm 
+    # If response is too long, generate a shorter version
+    if len(response) > 250:
+        print("Response too long, generating concise version...")
+        concise_prompt = f"""
+        Please summarize this fact-check response to be under 250 characters for Twitter,
+        while preserving the key factual information:
+        
+        Original response: {response}
+        
+        Concise version:
+        """
+        
+        # Initialize LLM (you'll need to pass your LLM instance or initialize here)
+        llm = GroqAPI(model_id="llama3-8b-8192", api_key=GROQ_API_KEY)
+        concise_response = llm.generate(concise_prompt, temperature=0.1, max_tokens=100)
+        
+        # Fallback if LLM fails or response is still too long
+        if len(concise_response) > 250 or not concise_response.strip():
+            print("Using fallback shortening method")
+            concise_response = response[:225] + "..." if len(response) > 225 else response
+        else:
+            response = concise_response.strip()
+
+
+         ###end   
     
     # Save the response immediately to ensure it's available
     with open("selected_response.txt", "w") as f:
         f.write(response)
     
-    # Create UI to show what's happening
-    frame = ttk.Frame(root, padding="20")
-    frame.pack(fill="both", expand=True)
-    
-    ttk.Label(frame, text="Analysis Result:", 
-              font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
-    
-    ttk.Label(frame, text=analysis, wraplength=500).pack(fill="x", pady=(0, 15))
-    
-    ttk.Label(frame, text="This tweet appears to be TRUE.", 
-              font=("Arial", 12, "bold"), foreground="green").pack(pady=(0, 15))
-    
-    # Instead of handling it ourselves, call the same function that works for false tweets
-    # This ensures we follow the exact same path that's working for false tweets
-    
+
+
     show_final_confirmation(root, tweet_url, response)
-    print("\nBoli")
+    
+    
+    
+    root.geometry("600x400")
+    root.mainloop()
 
 def extract_tweet_text(tweet_url):
     """More robust tweet extraction with proper Chrome setup"""

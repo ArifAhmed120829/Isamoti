@@ -237,7 +237,7 @@ def main():
     email = "ahmed19904888@gmail.com"
     username = "@rajlokkhi123"
     password = "Sajal12345"
-    post_url = "https://x.com/rajlokkhi123/status/1915291091815064079"
+    post_url = "https://x.com/rajlokkhi123/status/1915251831619436771"
     ##
     reply_text = get_reply_text()
     ##
